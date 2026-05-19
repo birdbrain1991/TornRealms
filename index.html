@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>KAIJU SKIRMISH</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=Exo+2:wght@300;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#04060a;--panel:#080c14;--panel2:#0c1220;
+  --border:#162030;--bhi:#1e3050;
+  --text:#7a9ab8;--thi:#b8d4f0;--dim:#344a60;
+  --cyan:#00c8f0;--red:#f03040;--green:#00e080;
+  --yellow:#f0c000;--purple:#a040f0;
+  --fhud:'Orbitron',monospace;--fmono:'Share Tech Mono',monospace;--fbody:'Exo 2',sans-serif;
+}
+html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-family:var(--fbody);overflow:hidden}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,200,240,.01) 3px,rgba(0,200,240,.01) 4px)}
+
+/* ── SCREEN SYSTEM ── */
+.screen{display:none;position:fixed;inset:0;flex-direction:column;overflow:hidden}
+.screen.on{display:flex}
+
+/* ── SHARED ── */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;
+  border-bottom:1px solid var(--border);flex-shrink:0;background:var(--panel)}
+.logo{font-family:var(--fhud);font-weight:900;font-size:.85rem;letter-spacing:.2em;
+  color:var(--cyan);text-shadow:0 0 20px rgba(0,200,240,.4)}
+.tinfo{font-family:var(--fmono);font-size:.58rem;color:var(--dim);letter-spacing:.1em}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--red);box-shadow:0 0 6px var(--red);animation:blink 1.8s infinite}
+.dot.ok{background:var(--green);box-shadow:0 0 6px var(--green);animation:none}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.1}}
+
+.btn{font-family:var(--fhud);font-size:.62rem;letter-spacing:.12em;padding:9px 18px;cursor:pointer;
+  border:1px solid var(--bhi);background:transparent;color:var(--thi);transition:all .15s;
+  clip-path:polygon(6px 0%,100% 0%,calc(100% - 6px) 100%,0% 100%)}
+.btn:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:0 0 10px rgba(0,200,240,.2)}
+.btn:active{transform:scale(.97)}
+.btn.c{border-color:var(--cyan);color:var(--cyan)}
+.btn.g{border-color:var(--green);color:var(--green)}
+.btn.r{border-color:var(--red);color:var(--red)}
+.btn.y{border-color:var(--yellow);color:var(--yellow)}
+.btn.ghost{border-color:var(--border);color:var(--dim)}
+
+.inp{font-family:var(--fmono);font-size:.95rem;letter-spacing:.15em;padding:10px 12px;
+  background:var(--panel2);border:1px solid var(--bhi);color:var(--thi);outline:none;width:100%}
+.inp:focus{border-color:var(--cyan)}
+.lbl{font-family:var(--fhud);font-size:.48rem;letter-spacing:.2em;color:var(--dim);margin-bottom:4px}
+
+.hpbar-t{height:6px;background:var(--panel2);border:1px solid var(--border)}
+.hpbar-f{height:100%;background:var(--green);transition:width .35s,background .35s}
+.hpbar-f.warn{background:var(--yellow)}.hpbar-f.crit{background:var(--red)}
+.hp-txt{font-family:var(--fmono);font-size:.55rem;color:var(--dim);text-align:right;margin-top:2px}
+
+.chip{font-family:var(--fmono);font-size:.48rem;padding:1px 5px;border:1px solid var(--dim);color:var(--dim);display:inline-block;margin:1px}
+.chip.bad{border-color:var(--red);color:var(--red);background:rgba(240,48,64,.08)}
+.chip.good{border-color:var(--green);color:var(--green);background:rgba(0,224,128,.06)}
+
+.slbl{font-family:var(--fhud);font-size:.46rem;letter-spacing:.2em;color:var(--dim);
+  padding-bottom:5px;border-bottom:1px solid var(--border);margin-bottom:8px}
+
+.log{flex:1;min-height:0;overflow-y:auto;padding:5px 8px;font-family:var(--fmono);font-size:.6rem;line-height:1.7}
+.lr{display:flex;gap:6px}.lr .ts{color:var(--dim);flex-shrink:0}
+.lr.sys .msg{color:var(--cyan)}.lr.dmg .msg{color:var(--red)}
+.lr.roll .msg{color:var(--yellow)}.lr.phase .msg{color:var(--purple);font-weight:bold}
+
+.dice{width:54px;height:54px;border:2px solid var(--bhi);background:var(--panel2);
+  color:var(--thi);font-family:var(--fhud);font-size:1rem;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);transition:all .15s}
+.dice:hover{border-color:var(--yellow);color:var(--yellow)}
+.dice.shake{animation:dshake .4s ease}
+.dice.used{border-color:var(--dim);color:var(--dim);cursor:default;pointer-events:none}
+@keyframes dshake{0%,100%{transform:rotate(0)}25%{transform:rotate(-12deg)}75%{transform:rotate(12deg)}}
+
+.bigr{font-family:var(--fhud);font-weight:900;font-size:2.6rem;text-align:center;
+  color:var(--yellow);text-shadow:0 0 20px rgba(240,192,0,.5);min-height:3rem;transition:all .2s}
+.bigr.crit{color:var(--green);text-shadow:0 0 20px rgba(0,224,128,.6)}
+.bigr.fumble{color:var(--red);text-shadow:0 0 20px rgba(240,48,64,.6)}
+
+.ecard{padding:10px 12px;border:1px solid var(--border);background:var(--panel2);position:relative;margin-bottom:6px}
+.ecard.mine{border-color:var(--cyan)}
+.ecard.kaiju{border-color:rgba(240,48,64,.4)}
+.ecard.active-turn::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent)}
+.ecard.kaiju.active-turn::before{background:linear-gradient(90deg,transparent,var(--red),transparent)}
+.ename{font-family:var(--fhud);font-size:.68rem;letter-spacing:.1em;color:var(--thi);margin-bottom:2px}
+.etype{font-family:var(--fmono);font-size:.53rem;color:var(--dim);margin-bottom:6px}
+
+.pbar{display:flex;gap:3px;padding:5px 10px;border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;scrollbar-width:none}
+.ps{font-family:var(--fhud);font-size:.43rem;letter-spacing:.07em;padding:3px 8px;
+  border:1px solid var(--border);color:var(--dim);white-space:nowrap;flex-shrink:0;
+  clip-path:polygon(5px 0%,100% 0%,calc(100% - 5px) 100%,0% 100%)}
+.ps.done{border-color:var(--bhi);color:var(--bhi)}
+.ps.active{border-color:var(--cyan);color:var(--cyan);background:rgba(0,200,240,.07)}
+.ps.kactive{border-color:var(--red);color:var(--red);background:rgba(240,48,64,.07)}
+
+.tbanner{text-align:center;padding:5px;font-family:var(--fhud);font-size:.58rem;
+  letter-spacing:.12em;border-bottom:1px solid var(--border);flex-shrink:0}
+.tbanner.mine{color:var(--cyan);background:rgba(0,200,240,.05)}
+.tbanner.wait{color:var(--dim)}
+.tbanner.kaiju{color:var(--red);background:rgba(240,48,64,.05)}
+
+.modal{display:none;position:fixed;inset:0;background:rgba(4,6,10,.88);z-index:500;
+  align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+.modal.on{display:flex}
+.mbox{width:min(380px,92vw);background:var(--panel);border:1px solid var(--bhi);padding:20px}
+.mtitle{font-family:var(--fhud);font-size:.72rem;letter-spacing:.18em;color:var(--cyan);margin-bottom:14px}
+
+.wopt{padding:8px 10px;border:1px solid var(--border);cursor:pointer;
+  transition:all .15s;display:flex;gap:10px;align-items:center;margin-bottom:4px}
+.wopt:hover{border-color:var(--bhi)}.wopt.sel{border-color:var(--cyan);background:rgba(0,200,240,.04)}
+.wbadge{font-family:var(--fmono);font-size:.46rem;padding:1px 5px;border:1px solid var(--bhi);color:var(--dim);flex-shrink:0}
+.wname{font-family:var(--fhud);font-size:.6rem;letter-spacing:.08em;color:var(--thi)}
+.wstat{font-family:var(--fmono);font-size:.55rem;color:var(--dim)}
+
+.abilbtn{padding:8px 12px;border:1px solid var(--border);background:transparent;
+  color:var(--text);font-family:var(--fmono);font-size:.63rem;cursor:pointer;
+  width:100%;text-align:left;margin-bottom:4px;transition:all .15s}
+.abilbtn:hover{border-color:var(--red);color:var(--red)}
+
+::-webkit-scrollbar{width:3px;height:3px}::-webkit-scrollbar-thumb{background:var(--bhi)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.fin{animation:fadeUp .22s ease forwards}
+
+/* ══ LOBBY ══ */
+#s-lobby{background:radial-gradient(ellipse 70% 50% at 50% 110%,rgba(0,200,240,.05),transparent),var(--bg);
+  align-items:center;justify-content:center;overflow-y:auto}
+.lwrap{width:min(420px,92vw);display:flex;flex-direction:column;gap:16px;padding:24px 0}
+.ltitle h1{font-family:var(--fhud);font-weight:900;font-size:clamp(2rem,7vw,3rem);
+  letter-spacing:.3em;color:var(--cyan);text-shadow:0 0 40px rgba(0,200,240,.3),0 0 80px rgba(0,200,240,.1);
+  line-height:1.1;text-align:center}
+.ltitle p{font-family:var(--fmono);font-size:.58rem;letter-spacing:.25em;color:var(--dim);margin-top:6px;text-align:center}
+.div{height:1px;background:linear-gradient(90deg,transparent,var(--bhi),transparent)}
+.lpanel{padding:16px;border:1px solid var(--border);background:var(--panel);display:flex;flex-direction:column;gap:12px}
+.err{font-family:var(--fmono);font-size:.56rem;color:var(--red);min-height:1em}
+.hint{font-family:var(--fmono);font-size:.56rem;color:var(--dim);line-height:1.8;text-align:center}
+
+/* ══ ROLES ══ */
+#s-roles{background:var(--bg)}
+.rgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:7px;
+  padding:10px;flex:1;min-height:0;overflow-y:auto}
+.rcard{border:1px solid var(--border);background:var(--panel2);padding:12px;cursor:pointer;
+  transition:all .18s;display:flex;flex-direction:column;gap:5px}
+.rcard:hover{border-color:var(--bhi);background:var(--panel)}
+.rcard.sel{border-color:var(--cyan);background:rgba(0,200,240,.05)}
+.rcard.kc{border-color:rgba(240,48,64,.3)}
+.rcard.kc.sel{border-color:var(--red);background:rgba(240,48,64,.05)}
+.rcard.taken{opacity:.3;pointer-events:none}
+.ricon{font-size:1.5rem}.rname{font-family:var(--fhud);font-size:.62rem;letter-spacing:.1em;color:var(--thi)}
+.rdesc{font-size:.58rem;color:var(--dim);line-height:1.5}
+.rtaken{font-family:var(--fmono);font-size:.5rem;color:var(--red)}
+.rmine{font-family:var(--fmono);font-size:.5rem;color:var(--cyan)}
+.rfooter{flex-shrink:0;padding:10px 14px;border-top:1px solid var(--border);background:var(--panel);
+  display:flex;align-items:center;justify-content:space-between;gap:10px}
+.rerr{font-family:var(--fmono);font-size:.56rem;color:var(--red);flex:1}
+
+/* ══ COMBAT ══ */
+#s-combat{background:var(--bg)}
+.cbody{flex:1;min-height:0;display:grid;grid-template-columns:190px 1fr;grid-template-rows:1fr 170px;overflow:hidden}
+.cb-left{grid-row:1/3;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.cb-left-inner{flex:1;min-height:0;overflow-y:auto;padding:7px;display:flex;flex-direction:column}
+.cb-top{padding:11px;overflow-y:auto;min-height:0;border-bottom:1px solid var(--border);
+  display:flex;flex-direction:column;gap:9px}
+.cb-bot{display:flex;flex-direction:column;overflow:hidden}
+.cb-bot-head{flex-shrink:0;padding:4px 8px;border-bottom:1px solid var(--border)}
+
+@media(max-width:560px){
+  .cbody{grid-template-columns:1fr;grid-template-rows:120px 1fr 140px}
+  .cb-left{grid-row:1;border-right:none;border-bottom:1px solid var(--border);max-height:120px}
+}
+</style>
+</head>
+<body>
+
+<!-- LOBBY -->
+<div id="s-lobby" class="screen on">
+  <div class="lwrap fin">
+    <div class="ltitle"><h1>KAIJU<br>SKIRMISH</h1><p>TACTICAL COMBAT · v0.2</p></div>
+    <div class="div"></div>
+    <div class="lpanel">
+      <div>
+        <div class="lbl">RAUM-CODE (min. 4 Zeichen)</div>
+        <input class="inp" id="lcode" type="text" maxlength="8" placeholder="Z.B.  ALPHA1" autocomplete="off" oninput="this.value=this.value.toUpperCase()">
+      </div>
+      <div class="err" id="lerr"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button class="btn c" onclick="doCreate()">+ ERSTELLEN</button>
+        <button class="btn"   onclick="doJoin()">→ BEITRETEN</button>
+      </div>
+    </div>
+    <p class="hint">Erstellen → Code teilen → alle öffnen diese Datei im selben Browser &amp; geben den Code ein.</p>
+  </div>
+</div>
+
+<!-- ROLES -->
+<div id="s-roles" class="screen">
+  <div class="topbar">
+    <span class="logo" style="font-size:.72rem">KAIJU SKIRMISH</span>
+    <span class="tinfo" id="rroom">RAUM: ——</span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="dot" id="rdot"></div>
+      <span class="tinfo" id="rcnt">0 VERBUNDEN</span>
+    </div>
+  </div>
+  <div style="padding:7px 11px 3px;flex-shrink:0"><div class="slbl" style="margin:0">ROLLE WÄHLEN</div></div>
+  <div class="rgrid" id="rgrid"></div>
+  <div class="rfooter">
+    <button class="btn r" onclick="doLeave()" style="padding:7px 12px">← ZURÜCK</button>
+    <span class="rerr" id="rerr"></span>
+    <button class="btn ghost" id="btnready" onclick="doReady()">BEREIT →</button>
+  </div>
+</div>
+
+<!-- COMBAT -->
+<div id="s-combat" class="screen">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:11px">
+      <span class="logo" id="cbname" style="font-size:.72rem">—</span>
+      <span class="tinfo" id="cbunit">—</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:9px">
+      <div class="dot ok"></div>
+      <span class="tinfo" id="cbround">RUNDE 1</span>
+      <button class="btn" style="padding:4px 9px;font-size:.48rem" onclick="openM('m-menu')">☰</button>
+    </div>
+  </div>
+  <div class="tbanner" id="tban">—</div>
+  <div class="pbar" id="pbar"></div>
+  <div class="cbody">
+    <div class="cb-left">
+      <div style="padding:5px 7px;border-bottom:1px solid var(--border);flex-shrink:0">
+        <div class="slbl" style="margin:0">EINHEITEN</div>
+      </div>
+      <div class="cb-left-inner" id="elist"></div>
+    </div>
+    <div class="cb-top" id="caction"></div>
+    <div class="cb-bot">
+      <div class="cb-bot-head"><div class="slbl" style="margin:0">KAMPFLOG</div></div>
+      <div class="log" id="clog"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: MENU -->
+<div class="modal" id="m-menu">
+  <div class="mbox">
+    <div class="mtitle">MENÜ</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn c" style="width:100%" onclick="closeM('m-menu')">FORTSETZEN</button>
+      <button class="btn r" style="width:100%" onclick="doLeave()">SESSION VERLASSEN</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: DAMAGE -->
+<div class="modal" id="m-dmg">
+  <div class="mbox">
+    <div class="mtitle">SCHADEN ANWENDEN</div>
+    <div class="tinfo" id="mdmg-tgt" style="margin-bottom:11px;color:var(--text)">Ziel: —</div>
+    <div class="lbl">SCHADENSWERT (Rüstung wird abgezogen)</div>
+    <input class="inp" id="mdmg-val" type="number" min="0" max="999" value="0" style="margin-bottom:11px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button class="btn r" onclick="confirmDmg()">ANWENDEN</button>
+      <button class="btn"   onclick="closeM('m-dmg')">ABBRUCH</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ═══════════════════════════════════════════════════════════════════
+//  KAIJU SKIRMISH v0.2
+//  G  = shared game state (mutated locally, broadcast to others)
+//  ME = local player info (never broadcast)
+// ═══════════════════════════════════════════════════════════════════
+
+// ── DATA ─────────────────────────────────────────────────────────
+const MECHS = [
+  {id:'p1',name:'IRON WARDEN', type:'Heavy Assault', hp:120,armor:4,spd:2,
+   weapons:['railgun','scatter','punch'],special:'Fortress Mode: +3 Armor für 1R'},
+  {id:'p2',name:'SPECTRE-9',   type:'Recon/Strike',  hp:80, armor:2,spd:5,
+   weapons:['twin_smg','blade','emp'],  special:'Ghost Protocol: unsichtbar 1R'},
+  {id:'p3',name:'COLOSSUS-X',  type:'Artillery',     hp:100,armor:3,spd:2,
+   weapons:['mortar','flak','kick'],    special:'Orbital Beacon: +2W6 nächster Angriff'},
+  {id:'p4',name:'VIPER UNIT',  type:'Skirmisher',    hp:90, armor:2,spd:4,
+   weapons:['plasma','ripper','smoke'], special:'Overdrive: 2 Angriffe diese R'},
+];
+const KAIJU_LIST = [
+  {id:'k1',name:'GORGOTHON',   type:'Titan-Klasse',   hp:300,armor:6,
+   abilities:['Stampede (2W10, alle nah)','Strahlenatem (4W10, Linie)','Schwanzpeitsche (1W8, AoE)','Berserker-Modus (+2 Schaden/R)'],
+   special:'Strahlenatem: 4W10 Schaden auf alle in Linie'},
+  {id:'k2',name:'VEXAR PRIME', type:'Psionics-Klasse',hp:220,armor:4,
+   abilities:['Mind Shatter (Aktion verd.)','Phase Shift (Angriff ausweichen)','Psi-Burst (2W8, AoE)','Absorption (W6 HP stehlen)'],
+   special:'Mind Shatter: Ziel verliert nächste Aktion'},
+  {id:'k3',name:'HYDRAGORE',   type:'Multi-Klasse',   hp:260,armor:5,
+   abilities:['Dreifach-Biss (3×2W8)','Regeneration (10HP/R)','Säurespucke (2W6+bleed)','Wickelgriff (immob.)'],
+   special:'Regeneration: +10 HP am Ende jeder Runde'},
+];
+const WEAPONS = {
+  railgun: {name:'Railgun',      dmg:'2W8',   type:'ENERGY',   range:'LANG',   note:''},
+  scatter: {name:'Streukanone',  dmg:'3W4',   type:'BALLISTIK',range:'MITTEL', note:''},
+  punch:   {name:'Faust',        dmg:'1W10+4',type:'MELEE',    range:'NAH',    note:''},
+  twin_smg:{name:'Dual-SMG',     dmg:'2W6',   type:'BALLISTIK',range:'KURZ',   note:''},
+  blade:   {name:'Monoklinge',   dmg:'2W8',   type:'MELEE',    range:'NAH',    note:'Ign. 2 Armor'},
+  emp:     {name:'EMP Granate',  dmg:'1W6',   type:'SPRENGST', range:'MITTEL', note:'STUNNED 1R'},
+  mortar:  {name:'Siegemörser',  dmg:'3W6',   type:'SPRENGST', range:'LANG',   note:'+1W4 Splash'},
+  flak:    {name:'Flak Array',   dmg:'2W4',   type:'BALLISTIK',range:'MITTEL', note:'AoE'},
+  kick:    {name:'Stampfattacke',dmg:'2W6+3', type:'MELEE',    range:'NAH',    note:'Pushback'},
+  plasma:  {name:'Plasmaknute',  dmg:'1W8+2', type:'ENERGY',   range:'KURZ',   note:'Bleed 1W4/R'},
+  ripper:  {name:'Ripper',       dmg:'2W6',   type:'MELEE',    range:'NAH',    note:'Krit b.5+'},
+  smoke:   {name:'Rauchgranate', dmg:'0',     type:'UTILITY',  range:'MITTEL', note:'Cover f.Team'},
+};
+const PHASES = ['INITIATIVE','WAFFE','ZIEL','ANGRIFF','SCHADEN','WARTEN','RUNDE ENDE'];
+const FLAGS   = {STUNNED:'bad',BERSERK:'bad',BLEEDING:'bad',COVER:'good',REGEN:'good',INVIS:'good'};
+const RDEFS   = [
+  {id:'p1',name:'SPIELER 1',icon:'🤖',mech:MECHS[0]},
+  {id:'p2',name:'SPIELER 2',icon:'🦾',mech:MECHS[1]},
+  {id:'p3',name:'SPIELER 3',icon:'⚙️',mech:MECHS[2]},
+  {id:'p4',name:'SPIELER 4',icon:'🔩',mech:MECHS[3]},
+  {id:'monster',name:'MONSTER CTRL',icon:'👾',mech:null,isKaiju:true},
+];
+
+// ── LOCAL STATE ───────────────────────────────────────────────────
+const ME = {
+  id:   Math.random().toString(36).slice(2,10),
+  room: '', role: null, mech: null, kaiju: null,
+};
+
+// ── GAME STATE (shared) ───────────────────────────────────────────
+let G = {
+  round:1, phase:0, turnRole:null,
+  roles:{},     // {roleId: playerId}
+  entities:{},  // {roleId: entity}
+};
+
+// per-turn scratch (local only, resets each round)
+let T = {weapon:null, target:null, atkRoll:null, dmgRoll:null};
+
+// ── BROADCAST ─────────────────────────────────────────────────────
+let CH = null;
+
+function setupCH(code) {
+  if(CH) CH.close();
+  CH = new BroadcastChannel('ks2_'+code);
+  CH.onmessage = e => recv(e.data);
+}
+function send(type, extra={}) {
+  if(CH) CH.postMessage({type, from:ME.id, ...extra});
+}
+function recv(msg) {
+  if(msg.from === ME.id) return;
+  if(msg.type === 'SYNC_REQ') { send('FULL', {G}); return; }
+  if(msg.type === 'FULL') {
+    const mine = G.entities[ME.role]; // preserve own entity
+    G = msg.G;
+    if(mine) G.entities[ME.role] = mine;
+    fullRender(); return;
+  }
+  if(msg.type === 'PATCH') {
+    Object.assign(G, msg.patch);
+    fullRender(); return;
+  }
+  if(msg.type === 'LOG') { appendLog(msg.e); return; }
+  if(msg.type === 'ROLES') {
+    // Merge roles (don't touch own)
+    Object.keys(msg.roles).forEach(k => { if(msg.roles[k] !== ME.id) G.roles[k] = msg.roles[k]; });
+    Object.keys(G.roles).forEach(k => { if(!(k in msg.roles) && G.roles[k] !== ME.id) delete G.roles[k]; });
+    if(document.getElementById('s-roles').classList.contains('on')) renderRoles();
+    return;
+  }
+}
+
+// broadcast a patch and apply locally
+function patch(p) { Object.assign(G,p); send('PATCH',{patch:p}); fullRender(); }
+// send full state (after big changes)
+function broadcastFull() { send('FULL',{G}); }
+
+function fullRender() {
+  renderEntityList();
+  renderPhasebar();
+  renderTurnBanner();
+  renderAction();
+}
+
+// ── LOBBY ─────────────────────────────────────────────────────────
+function doCreate() {
+  const code = document.getElementById('lcode').value.trim().toUpperCase();
+  const err  = document.getElementById('lerr');
+  if(code.length < 4) { err.textContent='Mindestens 4 Zeichen.'; return; }
+  err.textContent='';
+  ME.room=code;
+  G={round:1,phase:0,turnRole:null,roles:{},entities:{}};
+  setupCH(code);
+  goRoles();
+}
+function doJoin() {
+  const code = document.getElementById('lcode').value.trim().toUpperCase();
+  const err  = document.getElementById('lerr');
+  if(code.length < 4) { err.textContent='Mindestens 4 Zeichen.'; return; }
+  err.textContent='';
+  ME.room=code;
+  setupCH(code);
+  setTimeout(()=>send('SYNC_REQ'), 100);
+  goRoles();
+}
+function doLeave() {
+  if(ME.role) { delete G.roles[ME.role]; delete G.entities[ME.role]; broadcastFull(); }
+  ME.role=null; ME.mech=null; ME.kaiju=null; ME.room='';
+  if(CH){CH.close();CH=null;}
+  go('s-lobby'); closeM('m-menu');
+}
+
+// ── ROLES ─────────────────────────────────────────────────────────
+function goRoles() {
+  document.getElementById('rroom').textContent='RAUM: '+ME.room;
+  ME.role=null;
+  renderRoles();
+  go('s-roles');
+}
+
+function renderRoles() {
+  const grid = document.getElementById('rgrid');
+  grid.innerHTML='';
+  const cnt = Object.keys(G.roles).length;
+  document.getElementById('rcnt').textContent=cnt+' VERBUNDEN';
+  document.getElementById('rdot').className=cnt>0?'dot ok':'dot';
+
+  RDEFS.forEach(rd=>{
+    const takenBy=G.roles[rd.id];
+    const isMine=takenBy===ME.id;
+    const isTaken=!!takenBy&&!isMine;
+    const d=document.createElement('div');
+    d.className='rcard'+(rd.isKaiju?' kc':'')+(isMine?' sel':'')+(isTaken?' taken':'');
+    let extra='';
+    if(rd.mech) extra=`<div class="rdesc">${rd.mech.type}</div><div class="rdesc" style="color:var(--dim)">HP ${rd.mech.hp} · ARM ${rd.mech.armor} · SPD ${rd.mech.spd}</div>`;
+    if(rd.isKaiju) extra=`<div class="rdesc">Steuert das Kaiju</div>`;
+    if(isTaken) extra+=`<div class="rtaken">BELEGT</div>`;
+    if(isMine)  extra+=`<div class="rmine">✓ GEWÄHLT</div>`;
+    d.innerHTML=`<div class="ricon">${rd.icon}</div><div class="rname">${rd.name}</div>${extra}`;
+    if(!isTaken) d.onclick=()=>selectRole(rd.id);
+    grid.appendChild(d);
+  });
+
+  // ready button
+  const btn=document.getElementById('btnready');
+  if(ME.role){ btn.className='btn c'; }
+  else { btn.className='btn ghost'; }
+}
+
+function selectRole(rid) {
+  Object.keys(G.roles).forEach(k=>{ if(G.roles[k]===ME.id) delete G.roles[k]; });
+  G.roles[rid]=ME.id;
+  ME.role=rid;
+  const rd=RDEFS.find(r=>r.id===rid);
+  ME.mech=rd?.mech||null;
+  ME.kaiju=rd?.isKaiju ? KAIJU_LIST[0] : null;
+  send('ROLES',{roles:G.roles});
+  renderRoles();
+}
+
+function doReady() {
+  const err=document.getElementById('rerr');
+  if(!ME.role){err.textContent='Bitte erst eine Rolle wählen.';return;}
+  err.textContent='';
+  // Build entity
+  if(ME.role==='monster'){
+    const k=ME.kaiju||KAIJU_LIST[0]; ME.kaiju=k;
+    G.entities['monster']={id:'monster',name:k.name,type:k.type,maxHp:k.hp,hp:k.hp,armor:k.armor,flags:[],isKaiju:true};
+  } else {
+    const m=ME.mech;
+    G.entities[ME.role]={id:ME.role,name:m.name,type:m.type,maxHp:m.hp,hp:m.hp,armor:m.armor,flags:[],isKaiju:false,weapons:m.weapons};
+  }
+  if(!G.turnRole) G.turnRole=ME.role;
+  broadcastFull();
+  goCombat();
+}
+
+// ── COMBAT INIT ────────────────────────────────────────────────────
+function goCombat() {
+  const rd=RDEFS.find(r=>r.id===ME.role);
+  const isK=ME.role==='monster';
+  document.getElementById('cbname').textContent=rd?.name||ME.role;
+  document.getElementById('cbname').style.color=isK?'var(--red)':'var(--cyan)';
+  document.getElementById('cbunit').textContent=isK?(ME.kaiju?.name||''):(ME.mech?.name||'');
+  fullRender();
+  go('s-combat');
+  addLog({type:'sys',msg:`${rd?.name||ME.role} bereit (${isK?ME.kaiju?.name:ME.mech?.name})`},true);
+}
+
+// ── ENTITY LIST ───────────────────────────────────────────────────
+function renderEntityList() {
+  const list=document.getElementById('elist');
+  if(!list) return;
+  list.innerHTML='';
+  const all=Object.values(G.entities);
+  if(all.length===0){
+    list.innerHTML='<div style="font-family:var(--fmono);font-size:.56rem;color:var(--dim);padding:4px">Warte auf Spieler…</div>';
+    return;
+  }
+  all.forEach(e=>{
+    const isMe=e.id===ME.role;
+    const isTurn=e.id===G.turnRole;
+    const pct=Math.max(0,Math.round(e.hp/e.maxHp*100));
+    const bc=pct>60?'':pct>30?' warn':' crit';
+    const flags=(e.flags||[]).map(f=>`<span class="chip ${FLAGS[f]||''}">${f}</span>`).join('');
+    const d=document.createElement('div');
+    d.className='ecard'+(e.isKaiju?' kaiju':'')+(isMe?' mine':'')+(isTurn?' active-turn':'');
+    d.innerHTML=`
+      <div class="ename" style="${e.isKaiju?'color:var(--red)':''}">
+        ${e.name}
+        ${isMe?'<span style="font-size:.44rem;color:var(--cyan)"> [DU]</span>':''}
+        ${isTurn?'<span style="font-size:.44rem;color:var(--yellow)"> ▶</span>':''}
+      </div>
+      <div class="etype">${e.type}</div>
+      <div class="hpbar-t"><div class="hpbar-f${bc}" style="width:${pct}%"></div></div>
+      <div class="hp-txt">${e.hp}/${e.maxHp} HP · ARM ${e.armor}</div>
+      ${flags?`<div style="margin-top:3px">${flags}</div>`:''}
+    `;
+    list.appendChild(d);
+  });
+}
+
+// ── PHASE BAR ─────────────────────────────────────────────────────
+function renderPhasebar() {
+  const bar=document.getElementById('pbar'); if(!bar) return;
+  const isK=ME.role==='monster';
+  bar.innerHTML=PHASES.map((p,i)=>{
+    let c='ps';
+    if(i<G.phase) c+=' done';
+    else if(i===G.phase) c+=isK?' kactive':' active';
+    return `<div class="${c}">${p}</div>`;
+  }).join('');
+  document.getElementById('cbround').textContent='RUNDE '+G.round;
+}
+
+// ── TURN BANNER ───────────────────────────────────────────────────
+function renderTurnBanner() {
+  const ban=document.getElementById('tban'); if(!ban) return;
+  const isMyTurn=G.turnRole===ME.role;
+  const isKTurn=G.turnRole==='monster';
+  const e=G.entities[G.turnRole];
+  const name=e?.name||G.turnRole||'?';
+  if(isMyTurn){
+    ban.className='tbanner'+(ME.role==='monster'?' kaiju':' mine');
+    ban.textContent='▶ DEIN ZUG — '+PHASES[G.phase];
+  } else {
+    ban.className='tbanner wait';
+    ban.textContent=`WARTET: ${name} · ${PHASES[G.phase]}`;
+  }
+}
+
+// ── ACTION AREA ───────────────────────────────────────────────────
+function renderAction() {
+  const area=document.getElementById('caction'); if(!area) return;
+  const isMyTurn=G.turnRole===ME.role;
+  const ph=PHASES[G.phase];
+
+  if(!isMyTurn && ph!=='RUNDE ENDE'){
+    const e=G.entities[G.turnRole];
+    area.innerHTML=`
+      <div class="slbl">WARTEN</div>
+      <div style="font-family:var(--fmono);font-size:.68rem;color:var(--dim);line-height:2;padding:10px 0">
+        ${e?e.name:'?'} ist am Zug.<br>
+        <span style="color:var(--text)">Phase: ${ph}</span>
+      </div>
+    `;
+    return;
+  }
+
+  ({
+    'INITIATIVE': renderInit,
+    'WAFFE':      ME.role==='monster' ? renderMonsterPick : renderWeapon,
+    'ZIEL':       renderTarget,
+    'ANGRIFF':    renderAttack,
+    'SCHADEN':    renderDmgPhase,
+    'WARTEN':     renderWaitEnd,
+    'RUNDE ENDE': renderRoundEnd,
+  })[ph]?.call(null, area);
+}
+
+// INITIATIVE — everyone rolls including monster
+function renderInit(area){
+  area.innerHTML=`
+    <div class="slbl">INITIATIVE WÜRFELN</div>
+    <div style="font-family:var(--fmono);font-size:.67rem;color:var(--dim);margin-bottom:13px;line-height:1.9">
+      W20 würfeln. Höheres Ergebnis = früher.<br>
+      ${ME.role==='monster'?'<span style="color:var(--red)">Du steuerst das Kaiju.</span>':''}
+    </div>
+    <div style="display:flex;justify-content:center;margin-bottom:14px">
+      <button class="dice" id="d-i" onclick="doRollInit(this)">W20</button>
+    </div>
+    <div class="bigr" id="r-i"></div>
+  `;
+}
+function doRollInit(btn){
+  const n=roll(20);
+  btn.className='dice shake';
+  setTimeout(()=>btn.className='dice used',400);
+  const el=document.getElementById('r-i');
+  el.textContent=n+(n===20?' — KRITISCH!':n===1?' — MIES':'');
+  el.className='bigr'+(n===20?' crit':n===1?' fumble':'');
+  const rn=RDEFS.find(r=>r.id===ME.role)?.name||ME.role;
+  addLog({type:'roll',msg:`${rn} Initiative: ${n}`},true);
+  setTimeout(()=>advance(),1400);
+}
+
+// MONSTER: pick ability (replaces WAFFE phase)
+function renderMonsterPick(area){
+  const k=ME.kaiju||KAIJU_LIST[0];
+  area.innerHTML=`
+    <div class="slbl">KAIJU AKTION WÄHLEN</div>
+    <div class="ecard kaiju" style="margin-bottom:11px">
+      <div class="ename" style="color:var(--red)">${k.name} <span style="font-size:.5rem;color:var(--dim)">${k.type}</span></div>
+      <div style="font-family:var(--fmono);font-size:.58rem;color:var(--dim);margin-top:3px">Special: ${k.special}</div>
+    </div>
+    <div class="slbl">FÄHIGKEITEN</div>
+    <div id="abillist"></div>
+    <button class="btn r" style="margin-top:8px" onclick="advance()">ZUM ZIEL WÄHLEN →</button>
+  `;
+  const al=document.getElementById('abillist');
+  k.abilities.forEach(a=>{
+    const b=document.createElement('button');
+    b.className='abilbtn'; b.textContent=a;
+    b.onclick=()=>{
+      document.querySelectorAll('.abilbtn').forEach(x=>x.style.borderColor='');
+      b.style.borderColor='var(--red)';
+      T.weapon='__kaiju_'+a; // store as pseudo-weapon
+      addLog({type:'phase',msg:`★ KAIJU wählt: ${a}`},true);
+    };
+    al.appendChild(b);
+  });
+}
+
+// WAFFE (players)
+function renderWeapon(area){
+  const e=G.entities[ME.role];
+  const ws=e?.weapons||[];
+  area.innerHTML=`<div class="slbl">WAFFE WÄHLEN</div><div id="wl"></div><div id="wok" style="margin-top:9px"></div>`;
+  const wl=document.getElementById('wl');
+  ws.forEach(wid=>{
+    const w=WEAPONS[wid]; if(!w) return;
+    const d=document.createElement('div');
+    d.className='wopt'+(T.weapon===wid?' sel':'');
+    d.innerHTML=`<div class="wbadge">${w.type}</div><div><div class="wname">${w.name}</div><div class="wstat">${w.dmg} · ${w.range}${w.note?' · '+w.note:''}</div></div>`;
+    d.onclick=()=>{T.weapon=wid;renderAction();};
+    wl.appendChild(d);
+  });
+  if(T.weapon&&WEAPONS[T.weapon]){
+    document.getElementById('wok').innerHTML=`<button class="btn c" onclick="confWeapon()">BESTÄTIGEN →</button>`;
+  }
+}
+function confWeapon(){
+  addLog({type:'sys',msg:`Waffe: ${WEAPONS[T.weapon]?.name}`},true);
+  advance();
+}
+
+// ZIEL
+function renderTarget(area){
+  const targets=Object.values(G.entities).filter(e=>ME.role==='monster'?!e.isKaiju&&e.hp>0:e.isKaiju&&e.hp>0);
+  area.innerHTML=`<div class="slbl">ZIEL WÄHLEN</div><div id="tl"></div>`;
+  const tl=document.getElementById('tl');
+  if(!targets.length){
+    tl.innerHTML='<div style="font-family:var(--fmono);font-size:.67rem;color:var(--dim);padding:10px 0">Keine Ziele.</div>';
+    return;
+  }
+  targets.forEach(e=>{
+    const pct=Math.max(0,Math.round(e.hp/e.maxHp*100));
+    const bc=pct>60?'':pct>30?' warn':' crit';
+    const d=document.createElement('div');
+    d.className='ecard'+(e.isKaiju?' kaiju':'')+(T.target===e.id?' active-turn':'');
+    d.style.cursor='pointer';
+    d.innerHTML=`
+      <div class="ename" style="${e.isKaiju?'color:var(--red)':''}">→ ${e.name}</div>
+      <div class="etype">${e.type}</div>
+      <div class="hpbar-t"><div class="hpbar-f${bc}" style="width:${pct}%"></div></div>
+      <div class="hp-txt">${e.hp}/${e.maxHp} HP</div>
+    `;
+    d.onclick=()=>{T.target=e.id;renderAction();};
+    tl.appendChild(d);
+  });
+  if(T.target){
+    const cd=document.createElement('div');
+    cd.style.marginTop='9px';
+    cd.innerHTML=`<button class="btn c" onclick="confTarget()">ZIEL BESTÄTIGEN →</button>`;
+    tl.appendChild(cd);
+  }
+}
+function confTarget(){
+  addLog({type:'sys',msg:`Ziel: ${G.entities[T.target]?.name}`},true);
+  advance();
+}
+
+// ANGRIFF
+function renderAttack(area){
+  const w=WEAPONS[T.weapon];
+  const t=G.entities[T.target];
+  const isK=ME.role==='monster';
+  area.innerHTML=`
+    <div class="slbl">ANGRIFFSWURF</div>
+    ${w?`<div class="ecard" style="margin-bottom:9px;border-color:var(--bhi)">
+      <div class="ename">${w.name}</div>
+      <div class="etype">${w.type} · ${w.dmg}${w.note?' · '+w.note:''}</div>
+    </div>`:
+    (T.weapon?.startsWith('__kaiju_')?`<div class="ecard kaiju" style="margin-bottom:9px">
+      <div class="ename" style="color:var(--red)">${T.weapon.replace('__kaiju_','')}</div>
+    </div>`:'')
+    }
+    ${t?`<div style="font-family:var(--fmono);font-size:.63rem;color:var(--dim);margin-bottom:11px">→ Ziel: <span style="color:${t.isKaiju?'var(--red)':'var(--thi)'}">${t.name}</span> (ARM ${t.armor})</div>`:''}
+    <div style="display:flex;justify-content:center;margin-bottom:13px">
+      <button class="dice" id="d-a" onclick="doRollAtk(this)">W20</button>
+    </div>
+    <div class="bigr" id="r-a"></div>
+  `;
+}
+function doRollAtk(btn){
+  const n=roll(20); T.atkRoll=n;
+  btn.className='dice shake'; setTimeout(()=>btn.className='dice used',400);
+  const el=document.getElementById('r-a');
+  el.textContent=n+(n===20?' — KRITISCH!':n===1?' — PATZER!':'');
+  el.className='bigr'+(n===20?' crit':n===1?' fumble':'');
+  const rn=RDEFS.find(r=>r.id===ME.role)?.name||ME.role;
+  addLog({type:'roll',msg:`${rn} Angriff: ${n}${n===20?' [KRIT]':n===1?' [PATZER]':''}`},true);
+  if(n===1){
+    addLog({type:'dmg',msg:'Patzer — kein Schaden!'},true);
+    setTimeout(()=>{ G.phase=PHASES.indexOf('WARTEN'); patch({phase:G.phase}); },1400);
+  } else {
+    setTimeout(()=>advance(),1400);
+  }
+}
+
+// SCHADEN
+function renderDmgPhase(area){
+  const w=WEAPONS[T.weapon];
+  const isKaijuAtk=T.weapon?.startsWith('__kaiju_');
+  const isCrit=T.atkRoll===20;
+  const notation=w?w.dmg:(isKaijuAtk?'3W8':'2W6'); // fallback for kaiju
+  area.innerHTML=`
+    <div class="slbl">SCHADEN WÜRFELN</div>
+    <div style="font-family:var(--fmono);font-size:.67rem;color:var(--dim);margin-bottom:12px;line-height:1.8">
+      Würfel: <span style="color:var(--yellow)">${notation}${isCrit?' × 2 (KRIT)':''}</span>
+    </div>
+    <div style="display:flex;justify-content:center;margin-bottom:13px">
+      <button class="dice" id="d-d" onclick="doRollDmg(this,'${notation}')">WÜRFELN</button>
+    </div>
+    <div class="bigr" id="r-d"></div>
+    <div id="dmg-cta" style="margin-top:11px"></div>
+  `;
+}
+function doRollDmg(btn, notation){
+  const isCrit=T.atkRoll===20;
+  let n=rollDice(notation); if(isCrit) n*=2;
+  T.dmgRoll=n;
+  btn.className='dice used'; btn.onclick=null;
+  const el=document.getElementById('r-d');
+  el.textContent=n+(isCrit?' [KRIT ×2]':'');
+  el.className='bigr'+(isCrit?' crit':'');
+  const rn=RDEFS.find(r=>r.id===ME.role)?.name||ME.role;
+  addLog({type:'roll',msg:`${rn} Schaden: ${n}${isCrit?' [KRIT]':''}`},true);
+  document.getElementById('dmg-cta').innerHTML=`<button class="btn r" onclick="openDmgM()">SCHADEN ANWENDEN →</button>`;
+}
+function openDmgM(){
+  const t=G.entities[T.target];
+  document.getElementById('mdmg-tgt').textContent=`Ziel: ${t?.name||'?'} · Rüstung ${t?.armor||0} wird abgezogen`;
+  document.getElementById('mdmg-val').value=T.dmgRoll||0;
+  openM('m-dmg');
+}
+function confirmDmg(){
+  const raw=parseInt(document.getElementById('mdmg-val').value)||0;
+  const tid=T.target;
+  closeM('m-dmg');
+  applyDmg(tid,raw);
+  setTimeout(()=>advance(),300);
+}
+function applyDmg(eid,raw){
+  const e=G.entities[eid]; if(!e) return;
+  const red=Math.max(0,raw-(e.armor||0));
+  e.hp=Math.max(0,e.hp-red);
+  addLog({type:'dmg',msg:`${e.name} −${red} HP (${raw}−${e.armor||0}) → ${e.hp}/${e.maxHp}`},true);
+  if(e.hp<=0) addLog({type:'dmg',msg:`⚠ ${e.name} AUSGESCHALTET!`},true);
+  patch({entities:G.entities});
+}
+
+// WARTEN
+function renderWaitEnd(area){
+  area.innerHTML=`
+    <div class="slbl">ZUG BEENDET</div>
+    <div style="font-family:var(--fmono);font-size:.7rem;color:var(--dim);padding:14px 0;line-height:2;text-align:center">
+      Dein Zug ist abgeschlossen.<br>
+      <span style="color:var(--text)">Warte auf andere Spieler.</span>
+    </div>
+    <div style="text-align:center;font-size:1.3rem;display:inline-block;width:100%;animation:blink 1.5s infinite">⏳</div>
+  `;
+}
+
+// RUNDE ENDE
+function renderRoundEnd(area){
+  const isM=ME.role==='monster';
+  area.innerHTML=`
+    <div class="slbl">RUNDE ${G.round} ABGESCHLOSSEN</div>
+    <div style="font-family:var(--fmono);font-size:.68rem;color:var(--dim);margin-bottom:14px;line-height:1.8">
+      Alle Züge dieser Runde sind abgeschlossen.
+    </div>
+    ${isM
+      ? `<button class="btn g" style="width:100%" onclick="nextRound()">NÄCHSTE RUNDE STARTEN →</button>`
+      : `<div style="font-family:var(--fmono);font-size:.63rem;color:var(--dim)">Monster-Controller startet nächste Runde.</div>`
+    }
+  `;
+}
+function nextRound(){
+  T={weapon:null,target:null,atkRoll:null,dmgRoll:null};
+  addLog({type:'phase',msg:`══ RUNDE ${G.round+1} BEGINNT ══`},true);
+  patch({round:G.round+1, phase:0});
+}
+
+// ── ADVANCE PHASE ─────────────────────────────────────────────────
+function advance(){
+  patch({phase: Math.min(G.phase+1, PHASES.length-1)});
+}
+
+// ── DICE ──────────────────────────────────────────────────────────
+function roll(n){ return Math.floor(Math.random()*n)+1; }
+function rollDice(s){
+  const m=s.match(/(\d+)[Wd](\d+)(?:\+(\d+))?/);
+  if(!m) return 0;
+  let t=0; for(let i=0;i<+m[1];i++) t+=roll(+m[2]);
+  if(m[3]) t+=+m[3]; return t;
+}
+
+// ── LOG ───────────────────────────────────────────────────────────
+function addLog(e, bc=false){
+  const ts=new Date().toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  appendLog({...e,ts});
+  if(bc) send('LOG',{e:{...e,ts}});
+}
+function appendLog(e){
+  const log=document.getElementById('clog'); if(!log) return;
+  const d=document.createElement('div');
+  d.className='lr '+(e.type||'');
+  d.innerHTML=`<span class="ts">${e.ts||''}</span><span class="msg">${e.msg}</span>`;
+  log.appendChild(d); log.scrollTop=log.scrollHeight;
+}
+
+// ── SCREEN / MODAL ────────────────────────────────────────────────
+function go(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  document.getElementById(id)?.classList.add('on');
+}
+function openM(id){ document.getElementById(id)?.classList.add('on'); }
+function closeM(id){ document.getElementById(id)?.classList.remove('on'); }
+
+// ── VIEWPORT ─────────────────────────────────────────────────────
+(function setVh(){document.documentElement.style.setProperty('--vh',window.innerHeight*.01+'px')})();
+window.addEventListener('resize',()=>document.documentElement.style.setProperty('--vh',window.innerHeight*.01+'px'));
+window.addEventListener('orientationchange',()=>setTimeout(()=>document.documentElement.style.setProperty('--vh',window.innerHeight*.01+'px'),200));
+document.addEventListener('keydown',e=>{if(e.key==='Escape') document.querySelectorAll('.modal.on').forEach(m=>m.classList.remove('on'))});
+
+console.log('%cKAIJU SKIRMISH v0.2 — READY','color:#00c8f0;font-family:monospace;font-weight:bold;font-size:13px');
+</script>
+</body>
+</html>
